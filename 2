@@ -1,0 +1,92 @@
+import os
+import subprocess
+import time
+import win32gui
+import win32com.client
+import win32con
+
+def open_email_client():
+    # 设置邮件程序客户端的路径
+    mail_path = r'"D:\Program Files (x86)\Netease\MailMaster\Application\mailmaster.exe"'
+    # 打开邮件程序客户端
+    subprocess.Popen(mail_path)
+
+def find_email_window(title):
+    # 获取窗口句柄
+    hwnd = win32gui.FindWindow(None, title)
+    if hwnd == 0:
+        return None
+    else:
+        return hwnd
+
+def activate_window(hwnd):
+    # 激活窗口
+    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+    win32gui.SetForegroundWindow(hwnd)
+    time.sleep(1)
+
+def click_element(hwnd, class_name):
+    # 点击指定类名的元素
+    element = win32gui.FindWindowEx(hwnd, None, class_name, None)
+    win32gui.SendMessage(element, win32con.WM_LBUTTONDOWN, None, None)
+    win32gui.SendMessage(element, win32con.WM_LBUTTONUP, None, None)
+    time.sleep(1)
+    
+def send_keys(keys):
+    # 模拟键盘输入
+    shell = win32com.client.Dispatch("WScript.Shell")
+    shell.SendKeys(keys)
+    time.sleep(1)
+
+def download_attachments():
+    # 获取收件箱中所有邮件的标题和时间
+    mail_app = win32com.client.Dispatch("Outlook.Application")
+    inbox = mail_app.Session.GetDefaultFolder(6)
+    messages = inbox.Items
+    messages.Sort("[ReceivedTime]", True)
+    email_dict = {}
+    for message in messages:
+        if message.SenderEmailAddress == "ectmcp03@dimar.mil.co":
+            email_dict[message.Subject] = message.ReceivedTime
+
+    # 在收件箱中搜索包含关键词“MENSAJE”的邮件，并下载邮件附件
+    for subject, received_time in email_dict.items():
+        if "MENSAJE" in subject:
+            message = messages.Restrict("[ReceivedTime] = '{0}'".format(received_time.strftime('%m/%d/%Y %H:%M:%S')))
+            for attachment in message.Attachments:
+                # 修改附件名称为接收日期+原附件名称
+                file_name = received_time.strftime('%Y%m%d%H%M%S') + "_" + attachment.FileName
+                # 保存附件到指定文件夹
+                attachment.SaveAsFile(os.path.join("C:\\Users\\Alize\\Desktop\\海事局天气情况表", file_name))
+
+# 打开邮件程序客户端
+open_email_client()
+
+# 等待客户端打开
+time.sleep(10)
+# 查找邮件程序客户端窗口
+email_client_title = "网易邮箱大师"
+hwnd = find_email_window(email_client_title)
+
+if hwnd is not None:
+    # 激活邮件程序客户端窗口
+    activate_window(hwnd)
+
+    # 点击收件箱
+    click_element(hwnd, "NeteaseMailUI")
+    click_element(hwnd, "ListView")
+    click_element(hwnd, "MailList_ScrollView")
+
+    # 搜索指定发件人的邮件
+    send_keys("ectmcp03@dimar.mil.co")
+    send_keys("{ENTER}")
+
+    # 等待搜索结果加载完成
+    time.sleep(5)
+
+    # 搜索包含关键词的邮件并下载附件
+    download_attachments()
+
+# 关闭邮件程序客户端
+os.system("taskkill /im mailmaster.exe /f")
+
